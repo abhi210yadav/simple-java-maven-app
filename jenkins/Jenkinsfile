@@ -1,16 +1,22 @@
 pipeline {
     agent any
+
     options {
         skipStagesAfterUnstable()
     }
+
     stages {
+
         stage('Build') {
             steps {
+                echo '🔨 Building the project...'
                 sh 'mvn -B -DskipTests clean package'
             }
         }
+
         stage('Test') {
             steps {
+                echo '🧪 Running tests...'
                 sh 'mvn test'
             }
             post {
@@ -19,10 +25,44 @@ pipeline {
                 }
             }
         }
+
         stage('Deliver') { 
             steps {
-                sh './jenkins/scripts/deliver.sh' 
+                echo '🚀 Delivering artifact...'
+                sh '''
+                    set -e  # Exit immediately on any error
+                    echo "Current directory: $(pwd)"
+                    echo "Listing project files:"
+                    ls -la
+
+                    if [ ! -d "target" ]; then
+                      echo "❌ ERROR: 'target' directory not found!"
+                      exit 1
+                    fi
+
+                    echo "Listing target directory:"
+                    ls -la target
+
+                    JAR_FILE=$(ls target/*.jar 2>/dev/null | head -n 1)
+                    if [ -z "$JAR_FILE" ]; then
+                      echo "❌ ERROR: No JAR file found in target/!"
+                      exit 1
+                    fi
+
+                    echo "✅ Found JAR: $JAR_FILE"
+                    echo "Running the JAR file..."
+                    java -jar "$JAR_FILE"
+                '''
             }
+        }
+    }
+
+    post {
+        failure {
+            echo '❌ Build failed — check above logs for the exact command that returned exit code 1.'
+        }
+        success {
+            echo '✅ Pipeline completed successfully.'
         }
     }
 }
